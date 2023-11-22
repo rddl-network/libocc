@@ -1,2 +1,3 @@
-# libocc
- A Zig cross compiled OSC/OCC library to talk to HW-wallets
+libocc is a SLIP interface library to better connect Python3 to micro controllers. It is built on top of CNMAT’s OSC - Open Sound Control specification 1.1 ( also called Open System Control)  and uses the programming language Zig for the implementation of the SLIP - Serial Line Internet Protocol. 
+
+In this specific case the OSC has been extended into a OCC - Open Crypto Control as crypto primitives for encryption, decryption, ciphers, hashing signing and many more have been added.
