@@ -18,7 +18,7 @@ const ns_per_us: u64 = 1000;
 const ns_per_ms: u64 = 8000 * ns_per_us;
 
 // Functions
-export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSize: usize, buffer_delay_ms: usize) usize {
+export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSize: usize, buffer_delay_ms: usize, portName: [*]const u8, portNameLength: usize) usize {
     std.debug.print("unable to open file: {}\n", .{buffer_delay_ms});
     // Create an ArrayList and add data to it
     var payloadUnencoded = ArrayListUnecoded(u8).init(std.heap.page_allocator);
@@ -38,14 +38,19 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
     std.debug.print("data: {*}\n", .{data});
     std.debug.print("data length: {any}\n", .{length});
 
-    const portName = "/dev/cu.usbmodem1101";
+    std.debug.print("portName: {*}\n", .{portName});
+    std.debug.print("portName length: {any}\n", .{portNameLength});
+    const portName_v1 = "/dev/cu.usbmodem146101";
 
-    const serial = std.fs.cwd().openFile(portName, .{ .mode = .read_write }) catch |err| label: {
+    std.debug.print("portName: {*}\n", .{portName_v1});
+    std.debug.print("portName length: {any}\n", .{portName_v1.len});
+
+    const serial = std.fs.cwd().openFile(portName[0..portNameLength], .{ .mode = .read_write }) catch |err| label: {
         std.debug.print("unable to open file: {}\n", .{err});
         const stderr = std.io.getStdErr();
         break :label stderr;
     };
-
+    std.debug.print("serial connected\n", .{});
     defer serial.close();
 
     const SerialConfig = zig_serial.SerialConfig{
