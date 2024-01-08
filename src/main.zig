@@ -27,30 +27,18 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
     var payLoadSlipEncoded = ArrayListSlipEncoded(u8).init(std.heap.page_allocator);
     defer payLoadSlipEncoded.deinit();
 
-    std.debug.print("payload length: {}\n", .{length});
     for (data[0..length], 0..) |byte, index| {
         payloadUnencoded.append(byte) catch |err| {
             std.debug.print("unable to turn paylaod into array: {}\n", .{err});
         };
         std.debug.print("Byte {} = {}\n", .{ index, byte });
     }
-
-    std.debug.print("data: {*}\n", .{data});
-    std.debug.print("data length: {any}\n", .{length});
-
-    std.debug.print("portName: {*}\n", .{portName});
-    std.debug.print("portName length: {any}\n", .{portNameLength});
-    const portName_v1 = "/dev/cu.usbmodem146101";
-
-    std.debug.print("portName: {*}\n", .{portName_v1});
-    std.debug.print("portName length: {any}\n", .{portName_v1.len});
-
     const serial = std.fs.cwd().openFile(portName[0..portNameLength], .{ .mode = .read_write }) catch |err| label: {
         std.debug.print("unable to open file: {}\n", .{err});
         const stderr = std.io.getStdErr();
         break :label stderr;
     };
-    std.debug.print("serial connected\n", .{});
+    std.debug.print("serial connected to port {*}\n", .{portName});
     defer serial.close();
 
     const SerialConfig = zig_serial.SerialConfig{
