@@ -18,10 +18,9 @@ occ.occ_do.restype = ctypes.c_size_t
 # msg = OSCMessage('/IHW/bip39Mnemonic', ',is', [0, ""])
 msg = OSCMessage("/IHW/valiseMnemonicGet", ",s", [""])
 
+portName = "/dev/cu.usbmodem146101"
+portNameBytes = bytearray(portName, "utf-8")
 
-portName = "/dev/tty.usbmodem146101"
-print("portname length: ", len(portName))
-portNameBytes = portName.encode("utf-8")
 port_name_ptr = (ctypes.c_ubyte * len(portNameBytes))(*portNameBytes)
 input_data=encode_packet(msg)
 print(input_data)
