@@ -18,8 +18,7 @@ const ns_per_us: u64 = 1000;
 const ns_per_ms: u64 = 8000 * ns_per_us;
 
 // Functions
-export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSize: usize, buffer_delay_ms: usize) usize {
-    std.debug.print("unable to open file: {}\n", .{buffer_delay_ms});
+export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSize: usize, buffer_delay_ms: usize, portName: [*]const u8, portNameLength: usize) usize {
     // Create an ArrayList and add data to it
     var payloadUnencoded = ArrayListUnecoded(u8).init(std.heap.page_allocator);
     defer payloadUnencoded.deinit();
@@ -27,25 +26,21 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
     var payLoadSlipEncoded = ArrayListSlipEncoded(u8).init(std.heap.page_allocator);
     defer payLoadSlipEncoded.deinit();
 
-    std.debug.print("payload length: {}\n", .{length});
     for (data[0..length], 0..) |byte, index| {
+        _ = index; // autofix
+
         payloadUnencoded.append(byte) catch |err| {
             std.debug.print("unable to turn paylaod into array: {}\n", .{err});
         };
-        std.debug.print("Byte {} = {}\n", .{ index, byte });
+        // std.debug.print("Byte {} = {}\n", .{ index, byte });
     }
 
-    std.debug.print("data: {*}\n", .{data});
-    std.debug.print("data length: {any}\n", .{length});
-
-    const portName = "/dev/cu.usbmodem1101";
-
-    const serial = std.fs.cwd().openFile(portName, .{ .mode = .read_write }) catch |err| label: {
+    const serial = std.fs.cwd().openFile(portName[0..portNameLength], .{ .mode = .read_write }) catch |err| label: {
         std.debug.print("unable to open file: {}\n", .{err});
         const stderr = std.io.getStdErr();
         break :label stderr;
     };
-
+    std.debug.print("serial connected to port.\n", .{});
     defer serial.close();
 
     const SerialConfig = zig_serial.SerialConfig{
@@ -97,8 +92,8 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
         if (byte == 0xc0) {
             if (slipMsgFramer == 1) {
                 // Convert buffer to string and print
-                const stringSlice: []const u8 = payLoadEncoded.items; // This creates a slice of type []const u8
-                std.debug.print("Hex String: {s}\n", .{stringSlice});
+                // const stringSlice: []const u8 = payLoadEncoded.items; // This creates a slice of type []const u8
+                // std.debug.print("Hex String: {s}\n", .{stringSlice});
                 break;
             } else {
                 slipMsgFramer += 1;
@@ -160,7 +155,7 @@ pub fn encodeSLIP(payLoadUnencoded: *ArrayListEncoded(u8), payLoadSlipEncoded: *
         payLoadSlipEncoded.append(byte) catch |err| {
             std.debug.print("unable to encode SLIP: {}\n", .{err});
         };
-        std.debug.print("{x} ", .{byte});
+        // std.debug.print("{x} ", .{byte});
     }
     std.debug.print("\n", .{});
 }
@@ -200,6 +195,6 @@ pub fn decodeSLIP(payLoadEncoded: *ArrayListEncoded(u8)) !void {
     }
 
     // Convert ArrayList to string and print
-    const stringSlice: []const u8 = payLoadDecoded.items; // This creates a slice of type []const u8
-    std.debug.print("\nHex String: {s}\n\n", .{stringSlice});
+    // const stringSlice: []const u8 = payLoadDecoded.items; // This creates a slice of type []const u8
+    // std.debug.print("\nHex String: {s}\n\n", .{stringSlice});
 }
