@@ -1042,7 +1042,7 @@ test "iterate ports" {
 }
 
 test "basic configuration test" {
-    var cfg = SerialConfig{
+    const cfg = SerialConfig{
         .handshake = .none,
         .baud_rate = 115200,
         .parity = .none,

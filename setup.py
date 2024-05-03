@@ -48,7 +48,7 @@ setup(
         ),
     url='https://github.com/rddl-network/libocc/',
     author='Tom Fuerstner',
-    author_email='tom@rddl.io,
+    author_email='tom@rddl.io',
     packages=find_packages(where='.', exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     package_data={}, #{'mypkg': ['data/*.dat']},
     scripts=[],
