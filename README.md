@@ -2,6 +2,12 @@ libocc is a SLIP interface library to better connect Python3 to micro controller
 
 In this specific case the OSC has been extended into a OCC - Open Crypto Control as crypto primitives for encryption, decryption, ciphers, hashing signing and many more have been added.
 
+# building
+The zig libary can be build via
+```
+zig build-lib -lc -dynamic -isystem . -freference-trace  --name occ src/main.zig
+```
+The current version is compatible with zig 0.11.0 (on linux). The mac OS version works also with 0.12.0.
 
 Author & Licence
 Copyright (c) 2023 Tom Fuerstner for the RDDL Foundation

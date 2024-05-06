@@ -629,6 +629,26 @@ const VMIN = 6;
 const VSTART = 8;
 const VSTOP = 9;
 
+const native_os = builtin.os.tag;
+/// Whether to use libc for the POSIX API layer.
+const use_libc = builtin.link_libc or switch (native_os) {
+    .windows, .wasi => true,
+    else => false,
+};
+
+const linux = std.os.linux;
+const windows = std.os.windows;
+const wasi = std.os.wasi;
+
+/// A libc-compatible API layer.
+pub const system = if (use_libc)
+    std.c
+else switch (native_os) {
+    .linux => linux,
+    .plan9 => std.os.plan9,
+    else => struct {},
+};
+
 /// This function configures a serial port with the given config.
 /// `port` is an already opened serial port, on windows these
 /// are either called `\\.\COMxx\` or `COMx`, on unixes the serial
@@ -684,7 +704,13 @@ pub fn configureSerialPort(port: std.fs.File, config: SerialConfig) !void {
                 return error.WindowsError;
         },
         .linux, .macos => |tag| {
-            var settings = try std.os.tcgetattr(port.handle);
+            const termios = system.termios;
+            var settings: termios = undefined;
+            if (.linux == builtin.os.tag) {
+                _ = std.os.linux.tcgetattr(port.handle, &settings);
+            } else {
+                settings = try std.os.tcgetattr(port.handle);
+            }
 
             const os = switch (tag) {
                 .macos => std.os.darwin,
