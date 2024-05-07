@@ -1,1 +1,4 @@
 zig-cache
+*.o
+*.egg-info
+dist
