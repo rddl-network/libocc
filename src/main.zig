@@ -16,32 +16,41 @@ const SLIP_ESC_ESC: u8 = 0xDD;
 // Timer definitions for delays
 const ns_per_us: u64 = 1000;
 const ns_per_ms: u64 = 8000 * ns_per_us;
+const DEFAULT_TIMEOUT_MS: usize = 60_000; // 1 minute in milliseconds
 
 // Functions
-export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSize: usize, buffer_delay_ms: usize, portName: [*]const u8, portNameLength: usize) usize {
-    // Create an ArrayList and add data to it
+export fn occ_do(
+    data: [*]const u8,
+    length: usize,
+    outBuffer: [*]u8,
+    outBufferSize: usize,
+    buffer_delay_ms: usize,
+    portName: [*]const u8,
+    portNameLength: usize,
+    timeout_ms: usize
+) usize {
     var payloadUnencoded = ArrayListUnecoded(u8).init(std.heap.page_allocator);
     defer payloadUnencoded.deinit();
 
     var payLoadSlipEncoded = ArrayListSlipEncoded(u8).init(std.heap.page_allocator);
     defer payLoadSlipEncoded.deinit();
 
-    for (data[0..length], 0..) |byte, index| {
-        _ = index; // autofix
-
+        for (data[0..length]) |byte| {
         payloadUnencoded.append(byte) catch |err| {
-            std.debug.print("unable to turn paylaod into array: {}\n", .{err});
+            std.debug.print("unable to turn payload into array: {}\n", .{err});
         };
-        // std.debug.print("Byte {} = {}\n", .{ index, byte });
     }
 
-    const serial = std.fs.cwd().openFile(portName[0..portNameLength], .{ .mode = .read_write }) catch |err| label: {
+    const serial = std.fs.cwd().openFile(portName[0..portNameLength], .{ .mode = .read_write }) catch |err| {
         std.debug.print("unable to open file: {}\n", .{err});
-        const stderr = std.io.getStdErr();
-        break :label stderr;
+        return 0;
     };
+    defer {
+        resetAndCloseSerial(serial) catch |err| {
+            std.debug.print("Error resetting and closing serial port: {}\n", .{err});
+        };
+    }
     std.debug.print("serial connected to port.\n", .{});
-    defer serial.close();
 
     const SerialConfig = zig_serial.SerialConfig{
         .handshake = .none,
@@ -53,47 +62,49 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
 
     zig_serial.configureSerialPort(serial, SerialConfig) catch |err| {
         std.debug.print("Error configuring serial port: {}\n", .{err});
+        return 0;
     };
-
-    var slipMsgFramer: u8 = 0;
 
     encodeSLIP(&payloadUnencoded, &payLoadSlipEncoded) catch |err| {
         std.debug.print("unable to encode SLIP: {}\n", .{err});
+        return 0;
     };
 
-    // turn back payload unencoded into a slice to print to serial
     const payloadUnSlice: []const u8 = payLoadSlipEncoded.items;
 
-    // serial.writer().writeAll(data[0..length]) catch |err| {
     serial.writer().writeAll(payloadUnSlice) catch |err| {
-        std.debug.print("unable to open file: {}\n", .{err});
+        std.debug.print("unable to write to serial: {}\n", .{err});
+        return 0;
     };
 
-    std.time.sleep(buffer_delay_ms * std.time.ns_per_ms); // Adding a 10ms delay before retrying
+    std.time.sleep(buffer_delay_ms * std.time.ns_per_ms);
 
     var payLoadEncoded = ArrayListEncoded(u8).init(std.heap.page_allocator);
     defer payLoadEncoded.deinit();
 
-    while (true) {
-        var buf: [1]u8 = undefined;
+    const start_time = std.time.milliTimestamp();
+    var slipMsgFramer: u8 = 0;
 
+    while (true) {
+        const current_time = std.time.milliTimestamp();
+        if (current_time - start_time > timeout_ms) {
+            std.debug.print("Serial connection timed out after {} ms\n", .{timeout_ms});
+            return 0;
+        }
+
+        var buf: [1]u8 = undefined;
         const bytesRead = serial.reader().read(&buf) catch {
-            std.time.sleep(10 * std.time.ns_per_ms); // Adding a 10ms delay before retrying
+            std.time.sleep(10 * std.time.ns_per_ms);
             continue;
         };
 
-        if (bytesRead == 0) break; // EOF or no more data
+        if (bytesRead == 0) break;
 
         const byte: u8 = buf[0];
-
-        // Convert byte to hex and store in buffer
         payLoadEncoded.append(byte) catch continue;
 
         if (byte == 0xc0) {
             if (slipMsgFramer == 1) {
-                // Convert buffer to string and print
-                // const stringSlice: []const u8 = payLoadEncoded.items; // This creates a slice of type []const u8
-                // std.debug.print("Hex String: {s}\n", .{stringSlice});
                 break;
             } else {
                 slipMsgFramer += 1;
@@ -115,6 +126,31 @@ export fn occ_do(data: [*]const u8, length: usize, outBuffer: [*]u8, outBufferSi
 
     return returnLength;
 }
+
+fn resetAndCloseSerial(serial: std.fs.File) !void {
+    // Reset control pins
+    try zig_serial.changeControlPins(serial, .{ .rts = false, .dtr = false });
+    std.time.sleep(100 * std.time.ns_per_ms); // Wait for 100ms
+    try zig_serial.changeControlPins(serial, .{ .rts = true, .dtr = true });
+    std.time.sleep(100 * std.time.ns_per_ms); // Wait for 100ms
+
+    // Flush buffers
+    try zig_serial.flushSerialPort(serial, true, true);
+
+    // Reset to default configuration
+    const defaultConfig = zig_serial.SerialConfig{
+        .handshake = .none,
+        .baud_rate = 9600,
+        .parity = .none,
+        .word_size = 8,
+        .stop_bits = .one,
+    };
+    try zig_serial.configureSerialPort(serial, defaultConfig);
+
+    // Close the port
+    serial.close();
+}
+
 
 pub fn encodeSLIP(payLoadUnencoded: *ArrayListEncoded(u8), payLoadSlipEncoded: *ArrayListEncoded(u8)) !void {
     var count: usize = 0;
